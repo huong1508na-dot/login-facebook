@@ -111,20 +111,21 @@ class FacebookCookieLoginApp:
         self.login_btn.config(state="disabled")
         self.status.set(f"Đã đọc {len(cookies)} cookie. Đang mở Chrome...")
 
+        use_incognito = bool(self.incognito.get())
         thread = threading.Thread(
             target=self.login_worker,
-            args=(cookies,),
+            args=(cookies, use_incognito),
             daemon=True,
         )
         thread.start()
 
-    def login_worker(self, cookies):
+    def login_worker(self, cookies, use_incognito):
         driver = None
         try:
             chrome_options = Options()
             chrome_options.add_argument("--start-maximized")
             chrome_options.add_argument("--disable-notifications")
-            if self.incognito.get():
+            if use_incognito:
                 chrome_options.add_argument("--incognito")
 
             driver = webdriver.Chrome(options=chrome_options)
