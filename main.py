@@ -7,13 +7,14 @@ from urllib.parse import quote_plus
 
 import customtkinter as ctk
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.1"
+APP_VERSION = "2.1.1"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -413,6 +414,28 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.progress.set(0)
         self.login_btn.configure(state="normal", text="Đăng nhập Facebook")
 
+    def navigate_with_timeout(self, driver, url, timeout=30):
+        driver.set_page_load_timeout(timeout)
+        try:
+            driver.get(url)
+            return True
+        except TimeoutException:
+            try:
+                driver.execute_script("window.stop();")
+            except Exception:
+                pass
+            return False
+
+    def wait_for_document(self, driver, timeout=8):
+        try:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState")
+                in ("interactive", "complete")
+            )
+            return True
+        except Exception:
+            return False
+
     def login_worker(self, cookies, use_incognito):
         driver = None
 
@@ -426,6 +449,7 @@ class FacebookCookieLoginApp(ctk.CTk):
                 chrome_options.add_argument("--incognito")
 
             driver = webdriver.Chrome(options=chrome_options)
+            driver.set_script_timeout(15)
             self.drivers.append(driver)
 
             self.after(
@@ -436,10 +460,12 @@ class FacebookCookieLoginApp(ctk.CTk):
                 ),
             )
 
-            driver.get(FACEBOOK_URL)
+            loaded_home = self.navigate_with_timeout(driver, FACEBOOK_URL, timeout=30)
+            self.wait_for_document(driver, timeout=6)
 
             accepted = 0
             rejected = 0
+            accepted_names = set()
 
             for cookie in cookies:
                 payload = {
@@ -452,12 +478,22 @@ class FacebookCookieLoginApp(ctk.CTk):
                 try:
                     driver.add_cookie(payload)
                     accepted += 1
+                    accepted_names.add(cookie["name"])
                 except Exception:
                     rejected += 1
 
             if accepted == 0:
                 raise RuntimeError(
                     "Chrome không chấp nhận cookie nào. Hãy kiểm tra lại định dạng."
+                )
+
+            required = {"c_user", "xs"}
+            missing_required = sorted(required - accepted_names)
+            if missing_required:
+                raise RuntimeError(
+                    "Thiếu cookie phiên cần thiết hoặc Chrome không nhận: "
+                    + ", ".join(missing_required)
+                    + "."
                 )
 
             self.after(
@@ -468,10 +504,22 @@ class FacebookCookieLoginApp(ctk.CTk):
                 ),
             )
 
-            driver.get("https://www.facebook.com/me/")
-            current = driver.current_url.lower()
+            profile_loaded = self.navigate_with_timeout(
+                driver,
+                "https://www.facebook.com/me/",
+                timeout=30,
+            )
+            self.wait_for_document(driver, timeout=8)
+            current = (driver.current_url or "").lower()
 
-            if "checkpoint" in current:
+            blocked_markers = (
+                "checkpoint",
+                "two_step_verification",
+                "login/identify",
+                "recover/",
+            )
+
+            if any(marker in current for marker in blocked_markers):
                 text = (
                     "Facebook yêu cầu checkpoint/xác minh. "
                     "Hãy hoàn tất trực tiếp trong Chrome."
@@ -483,10 +531,18 @@ class FacebookCookieLoginApp(ctk.CTk):
                     "Cookie có thể đã hết hạn hoặc không còn hợp lệ."
                 )
                 kind = "warning"
-            else:
+            elif not driver.get_cookie("c_user"):
                 text = (
-                    f"Đã mở Facebook • cookie nhận: {accepted}"
+                    "Cookie c_user đã bị Facebook/Chrome loại bỏ sau khi kiểm tra. "
+                    "Phiên đăng nhập không còn hợp lệ."
+                )
+                kind = "warning"
+            else:
+                timeout_note = " • trang tải chậm" if not (loaded_home and profile_loaded) else ""
+                text = (
+                    f"Đăng nhập hợp lệ • cookie nhận: {accepted}"
                     + (f" • bỏ qua: {rejected}" if rejected else "")
+                    + timeout_note
                 )
                 kind = "normal"
 
@@ -511,9 +567,13 @@ class FacebookCookieLoginApp(ctk.CTk):
                     pass
 
         except Exception as exc:
+            error_text = str(exc)
             self.after(
                 0,
-                lambda: messagebox.showerror("Không thể đăng nhập", str(exc)),
+                lambda error_text=error_text: messagebox.showerror(
+                    "Không thể đăng nhập",
+                    error_text,
+                ),
             )
             self.after(0, lambda: self.set_status("Không thể nạp cookie", "error"))
 
@@ -681,9 +741,13 @@ class FacebookCookieLoginApp(ctk.CTk):
             )
 
         except Exception as exc:
+            error_text = str(exc)
             self.after(
                 0,
-                lambda: messagebox.showerror("Quét group thất bại", str(exc)),
+                lambda error_text=error_text: messagebox.showerror(
+                    "Quét group thất bại",
+                    error_text,
+                ),
             )
             self.after(
                 0,
