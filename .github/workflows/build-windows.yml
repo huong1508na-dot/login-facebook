@@ -55,7 +55,13 @@ jobs:
           if ($p1.ExitCode -ne 0) { throw "EXE parser self-test failed with exit code $($p1.ExitCode)" }
 
           $p2 = Start-Process -FilePath ".\dist\FacebookCookieLogin.exe" -ArgumentList "--chrome-self-test" -Wait -PassThru
-          if ($p2.ExitCode -ne 0) { throw "EXE Chrome self-test failed with exit code $($p2.ExitCode)" }
+          if ($p2.ExitCode -ne 0) {
+            if (Test-Path ".\chrome-self-test-error.txt") {
+              Write-Host "Chrome self-test diagnostic:"
+              Get-Content ".\chrome-self-test-error.txt"
+            }
+            throw "EXE Chrome self-test failed with exit code $($p2.ExitCode)"
+          }
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
