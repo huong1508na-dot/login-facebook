@@ -1,6 +1,12 @@
+import os
 import re
 import sys
 import threading
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 import time
 import tkinter as tk
 from tkinter import messagebox
@@ -875,7 +881,12 @@ def run_chrome_self_test():
         driver.set_page_load_timeout(20)
         driver.get("data:text/html,<title>ok</title><p>chrome-self-test</p>")
         return 0 if driver.title == "ok" else 2
-    except Exception:
+    except Exception as exc:
+        try:
+            with open("chrome-self-test-error.txt", "w", encoding="utf-8") as handle:
+                handle.write(f"{type(exc).__name__}: {exc}")
+        except Exception:
+            pass
         return 1
     finally:
         if driver:
