@@ -1,53 +1,67 @@
-# Facebook Cookie Login - Local
+# Facebook Cookie Login v2
 
-Ứng dụng Python có giao diện để nạp **cookie của chính tài khoản Facebook bạn** vào Google Chrome và mở Facebook.
+Ứng dụng Windows có giao diện hiện đại để nạp **cookie của chính tài khoản Facebook bạn** vào Google Chrome và mở phiên đăng nhập cục bộ.
 
-## Tính năng
+## Bản v2 có gì mới?
 
-- Giao diện đơn giản bằng Tkinter.
-- Nhận cookie dạng: `c_user=...; xs=...; datr=...;`
-- Mở Google Chrome bằng Selenium.
-- Nạp cookie trực tiếp vào phiên Chrome trên máy.
+- Giao diện dark mode bằng CustomTkinter.
+- Nút **Dán từ clipboard** và **Xóa**.
+- Hiển thị số cookie nhận được.
+- Thanh trạng thái và hiệu ứng xử lý khi mở Chrome.
+- Tùy chọn mở Chrome ẩn danh.
+- Tự đóng các phiên Chrome do ứng dụng mở khi thoát app.
 - Không lưu cookie ra file.
-- Phát hiện sơ bộ khi Facebook chuyển về trang đăng nhập hoặc checkpoint.
-- Không vượt CAPTCHA, checkpoint hoặc 2FA.
+- Có script và GitHub Actions để build Windows EXE.
+
+## Cách dùng bản Python
+
+1. Cài Google Chrome.
+2. Cài Python 3.10+.
+3. Chạy `run.bat`.
+4. Dán cookie dạng:
+   `c_user=...; xs=...; datr=...;`
+5. Nhấn **Đăng nhập Facebook**.
+
+## Build file EXE trên Windows
+
+Chạy:
+
+```text
+build_exe.bat
+```
+
+Sau khi build thành công, file nằm tại:
+
+```text
+dist\FacebookCookieLogin.exe
+```
+
+EXE được build dạng một file và không hiện cửa sổ console.
+
+## Build tự động bằng GitHub Actions
+
+Workflow `Build Windows EXE` tự chạy khi các file ứng dụng chính thay đổi.
+
+Vào tab **Actions** → chọn lần chạy **Build Windows EXE** → tải artifact:
+
+```text
+FacebookCookieLogin-Windows
+```
+
+Artifact chứa `FacebookCookieLogin.exe`.
+
+## Lưu ý bảo mật
+
+- Chỉ sử dụng cookie của tài khoản bạn sở hữu hoặc được phép quản lý.
+- Không đăng cookie thật lên GitHub, chat công khai hoặc gửi cho người khác.
+- Cookie phiên có thể cấp quyền truy cập tài khoản tương tự một phiên đăng nhập.
+- Ứng dụng không có chức năng lấy cookie từ máy khác.
+- Ứng dụng không vượt checkpoint, CAPTCHA hoặc 2FA.
+- Nếu Facebook yêu cầu xác minh, hãy hoàn tất trực tiếp trong Chrome.
 
 ## Yêu cầu
 
 - Windows 10/11
-- Python 3.10+ khuyến nghị
 - Google Chrome
-- Kết nối Internet
-
-Selenium 4 có Selenium Manager, vì vậy thông thường không cần tự tải ChromeDriver.
-
-## Cách chạy nhanh
-
-1. Tải repo về máy hoặc chọn **Code > Download ZIP**.
-2. Giải nén.
-3. Chạy `run.bat`.
-4. Dán cookie của tài khoản bạn.
-5. Nhấn **Login Facebook**.
-
-Hoặc chạy bằng terminal:
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-## Định dạng cookie
-
-Ví dụ cấu trúc:
-
-```text
-c_user=YOUR_VALUE; xs=YOUR_VALUE; datr=YOUR_VALUE;
-```
-
-Không đăng cookie thật lên GitHub, chat công khai hoặc gửi cho người khác. Cookie phiên có thể cấp quyền truy cập tài khoản tương tự một phiên đăng nhập.
-
-## Lưu ý bảo mật
-
-Công cụ này chỉ dành cho tài khoản bạn sở hữu hoặc được phép quản lý. Ứng dụng không có chức năng lấy cookie từ máy khác, đánh cắp phiên đăng nhập, vượt checkpoint, CAPTCHA hay 2FA.
-
-Nếu Facebook yêu cầu xác minh, hãy hoàn tất trực tiếp trong cửa sổ Chrome.
+- Internet
+- Với bản EXE đã build: không cần cài Python để chạy ứng dụng.
