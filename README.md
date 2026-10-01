@@ -92,3 +92,14 @@ Sau khi quét group:
 6. Lặp lại cho đến hết danh sách đã chọn.
 
 Tool không tự gửi yêu cầu tham gia hàng loạt; mỗi lần tham gia vẫn do bạn xác nhận trực tiếp trên Facebook.
+
+
+## Chế độ hỗ trợ thao tác (v2.3)
+
+Khi đang duyệt danh sách group đã chọn:
+
+- **F8** hoặc nút **Tham gia nhóm hiện tại**: tool tìm nút Join trên đúng trang Facebook Group và bấm giúp bạn.
+- Nếu group hiện câu hỏi, điều khoản hoặc bước xác nhận bổ sung, xử lý trực tiếp trong Chrome.
+- **F9** hoặc **Nhóm tiếp theo**: chuyển sang group kế tiếp.
+
+Chế độ này giảm thao tác chuột xuống mức tối thiểu nhưng vẫn cần một xác nhận của bạn cho từng group.
