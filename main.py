@@ -1,4 +1,5 @@
 import re
+import sys
 import threading
 import time
 import tkinter as tk
@@ -855,6 +856,41 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.destroy()
 
 
+def run_self_test():
+    sample = "c_user=12345; xs=abc%3Axyz; datr=test;"
+    parsed = parse_cookie_header(sample)
+    names = {item["name"] for item in parsed}
+    return 0 if {"c_user", "xs", "datr"}.issubset(names) else 1
+
+
+def run_chrome_self_test():
+    driver = None
+    try:
+        options = Options()
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(20)
+        driver.get("data:text/html,<title>ok</title><p>chrome-self-test</p>")
+        return 0 if driver.title == "ok" else 2
+    except Exception:
+        return 1
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        raise SystemExit(run_self_test())
+
+    if "--chrome-self-test" in sys.argv:
+        raise SystemExit(run_chrome_self_test())
+
     app = FacebookCookieLoginApp()
     app.mainloop()
