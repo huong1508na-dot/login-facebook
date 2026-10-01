@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.2"
+APP_VERSION = "2.3"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -60,6 +60,8 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.review_queue = []
         self.review_index = -1
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.bind("<F8>", lambda _event: self.join_current_group())
+        self.bind("<F9>", lambda _event: self.open_next_review_group())
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -128,7 +130,7 @@ class FacebookCookieLoginApp(ctk.CTk):
         login_tab.grid_columnconfigure(0, weight=1)
         login_tab.grid_rowconfigure(1, weight=1)
         groups_tab.grid_columnconfigure(0, weight=1)
-        groups_tab.grid_rowconfigure(2, weight=1)
+        groups_tab.grid_rowconfigure(3, weight=1)
 
         self._build_login_tab(login_tab)
         self._build_groups_tab(groups_tab)
@@ -360,13 +362,36 @@ class FacebookCookieLoginApp(ctk.CTk):
         )
         self.review_next_btn.grid(row=0, column=6, sticky="e", padx=(4, 0))
 
+        assist_bar = ctk.CTkFrame(parent, corner_radius=14)
+        assist_bar.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 10))
+        assist_bar.grid_columnconfigure(0, weight=1)
+
+        self.join_current_btn = ctk.CTkButton(
+            assist_bar,
+            text="Tham gia nhóm hiện tại  •  F8",
+            height=48,
+            corner_radius=12,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            state="disabled",
+            command=self.join_current_group,
+        )
+        self.join_current_btn.grid(row=0, column=0, sticky="ew", padx=(12, 6), pady=12)
+
+        ctk.CTkLabel(
+            assist_bar,
+            text="F9 = nhóm tiếp theo",
+            width=120,
+            text_color=("gray45", "gray65"),
+            font=ctk.CTkFont(size=11),
+        ).grid(row=0, column=1, padx=(6, 12), pady=12)
+
         self.group_results_frame = ctk.CTkScrollableFrame(
             parent,
             corner_radius=16,
             label_text="Kết quả tìm thấy",
         )
         self.group_results_frame.grid(
-            row=2,
+            row=3,
             column=0,
             sticky="nsew",
             padx=14,
@@ -834,6 +859,7 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.review_queue = []
         self.review_index = -1
         self.review_next_btn.configure(state="disabled")
+        self.join_current_btn.configure(state="disabled")
 
         for widget in self.group_results_frame.winfo_children():
             widget.destroy()
@@ -916,6 +942,7 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.review_queue = []
         self.review_index = -1
         self.review_next_btn.configure(state="disabled")
+        self.join_current_btn.configure(state="disabled")
         self.update_selected_group_status()
 
     def start_selected_review(self):
@@ -935,16 +962,19 @@ class FacebookCookieLoginApp(ctk.CTk):
             return
 
         self.review_next_btn.configure(state="normal")
+        self.join_current_btn.configure(state="normal")
         self.open_next_review_group()
 
     def open_next_review_group(self):
         if not self.review_queue:
             self.review_next_btn.configure(state="disabled")
+            self.join_current_btn.configure(state="disabled")
             return
 
         self.review_index += 1
         if self.review_index >= len(self.review_queue):
             self.review_next_btn.configure(state="disabled")
+            self.join_current_btn.configure(state="disabled")
             self.group_status.configure(
                 text="Đã duyệt hết các group đã chọn."
             )
@@ -962,10 +992,13 @@ class FacebookCookieLoginApp(ctk.CTk):
                 "Phiên Chrome đã đóng. Hãy đăng nhập lại.",
             )
             self.review_next_btn.configure(state="disabled")
+            self.join_current_btn.configure(state="disabled")
             return
 
         try:
             driver.get(group["url"])
+            self.wait_for_document(driver, timeout=8)
+            self.join_current_btn.configure(state="normal")
             self.group_status.configure(
                 text=(
                     f"Đang duyệt {self.review_index + 1}/{len(self.review_queue)}: "
@@ -975,6 +1008,163 @@ class FacebookCookieLoginApp(ctk.CTk):
             )
         except Exception as exc:
             messagebox.showerror("Không mở được group", str(exc))
+
+
+    def _find_visible_button_by_labels(self, driver, labels):
+        lowered = {label.casefold() for label in labels}
+
+        candidates = driver.find_elements(
+            By.XPATH,
+            "//*[@role='button' or self::button]",
+        )
+
+        for element in candidates:
+            try:
+                text = " ".join((element.text or "").split()).casefold()
+                aria = " ".join(
+                    (element.get_attribute("aria-label") or "").split()
+                ).casefold()
+
+                if (text in lowered or aria in lowered) and element.is_displayed():
+                    if element.is_enabled():
+                        return element
+            except Exception:
+                continue
+
+        return None
+
+    def join_current_group(self):
+        if self.review_index < 0 or self.review_index >= len(self.review_queue):
+            messagebox.showinfo(
+                "Chưa có group đang duyệt",
+                "Hãy chọn group và bấm Duyệt đã chọn trước.",
+            )
+            return
+
+        driver = self.get_active_driver()
+        if not driver:
+            messagebox.showinfo(
+                "Chưa có phiên Facebook",
+                "Phiên Chrome đã đóng. Hãy đăng nhập lại.",
+            )
+            return
+
+        self.join_current_btn.configure(
+            state="disabled",
+            text="Đang tìm nút Join...",
+        )
+
+        threading.Thread(
+            target=self._join_current_group_worker,
+            args=(driver,),
+            daemon=True,
+        ).start()
+
+    def _join_current_group_worker(self, driver):
+        try:
+            already_labels = (
+                "Đã tham gia",
+                "Joined",
+                "Đã gửi yêu cầu",
+                "Request sent",
+                "Đang chờ",
+                "Pending",
+            )
+            join_labels = (
+                "Tham gia nhóm",
+                "Tham gia",
+                "Join group",
+                "Join",
+            )
+
+            self.wait_for_document(driver, timeout=8)
+
+            already = self._find_visible_button_by_labels(
+                driver,
+                already_labels,
+            )
+            if already:
+                self.after(
+                    0,
+                    lambda: self.group_status.configure(
+                        text=(
+                            "Group hiện tại đã tham gia hoặc yêu cầu đang chờ. "
+                            "Bạn có thể chuyển sang nhóm tiếp theo."
+                        )
+                    ),
+                )
+                return
+
+            join_button = None
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: self._find_visible_button_by_labels(
+                        d,
+                        join_labels,
+                    )
+                    is not None
+                )
+                join_button = self._find_visible_button_by_labels(
+                    driver,
+                    join_labels,
+                )
+            except Exception:
+                pass
+
+            if not join_button:
+                self.after(
+                    0,
+                    lambda: messagebox.showwarning(
+                        "Không tìm thấy nút Join",
+                        (
+                            "Tool không tìm thấy nút Tham gia trên group này. "
+                            "Có thể bạn đã tham gia, group không cho tham gia trực tiếp, "
+                            "hoặc giao diện Facebook đã thay đổi."
+                        ),
+                    ),
+                )
+                return
+
+            try:
+                driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'});",
+                    join_button,
+                )
+                time.sleep(0.25)
+                driver.execute_script("arguments[0].click();", join_button)
+            except Exception:
+                join_button.click()
+
+            time.sleep(0.8)
+
+            self.after(
+                0,
+                lambda: self.group_status.configure(
+                    text=(
+                        "Đã bấm Join cho group hiện tại. "
+                        "Nếu Facebook hiện câu hỏi/điều khoản, hãy xử lý trong Chrome; "
+                        "sau đó bấm Nhóm tiếp theo hoặc F9."
+                    )
+                ),
+            )
+
+        except Exception as exc:
+            error_text = str(exc)
+            self.after(
+                0,
+                lambda error_text=error_text: messagebox.showerror(
+                    "Không thể bấm Join",
+                    error_text,
+                ),
+            )
+        finally:
+            self.after(
+                0,
+                lambda: self.join_current_btn.configure(
+                    state="normal",
+                    text="Tham gia nhóm hiện tại  •  F8",
+                ),
+            )
 
     def open_group(self, url):
         driver = self.get_active_driver()
