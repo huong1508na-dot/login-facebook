@@ -1,15 +1,19 @@
+import re
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox
+from urllib.parse import quote_plus
 
 import customtkinter as ctk
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -39,10 +43,11 @@ class FacebookCookieLoginApp(ctk.CTk):
         super().__init__()
 
         self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry("920x650")
-        self.minsize(820, 590)
+        self.geometry("980x720")
+        self.minsize(880, 640)
 
         self.drivers = []
+        self.group_results = []
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.grid_columnconfigure(0, weight=1)
@@ -53,7 +58,7 @@ class FacebookCookieLoginApp(ctk.CTk):
         self._build_footer()
 
     def _build_header(self):
-        header = ctk.CTkFrame(self, corner_radius=0, height=112)
+        header = ctk.CTkFrame(self, corner_radius=0, height=108)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(1, weight=1)
 
@@ -67,24 +72,24 @@ class FacebookCookieLoginApp(ctk.CTk):
             text_color="white",
             font=ctk.CTkFont(size=38, weight="bold"),
         )
-        logo.grid(row=0, column=0, rowspan=2, padx=(28, 16), pady=26)
+        logo.grid(row=0, column=0, rowspan=2, padx=(28, 16), pady=24)
 
         title = ctk.CTkLabel(
             header,
-            text="Facebook Cookie Login",
+            text="Facebook Session Toolkit",
             anchor="w",
             font=ctk.CTkFont(size=25, weight="bold"),
         )
-        title.grid(row=0, column=1, sticky="sw", pady=(26, 0))
+        title.grid(row=0, column=1, sticky="sw", pady=(24, 0))
 
         subtitle = ctk.CTkLabel(
             header,
-            text="Local session launcher • Cookie không được lưu vào file",
+            text="Cookie login • Group Finder • Local-only",
             anchor="w",
             text_color=("gray40", "gray70"),
             font=ctk.CTkFont(size=13),
         )
-        subtitle.grid(row=1, column=1, sticky="nw", pady=(3, 24))
+        subtitle.grid(row=1, column=1, sticky="nw", pady=(3, 22))
 
         version = ctk.CTkLabel(
             header,
@@ -99,12 +104,27 @@ class FacebookCookieLoginApp(ctk.CTk):
 
     def _build_content(self):
         body = ctk.CTkFrame(self, fg_color="transparent")
-        body.grid(row=1, column=0, sticky="nsew", padx=26, pady=22)
+        body.grid(row=1, column=0, sticky="nsew", padx=24, pady=20)
         body.grid_columnconfigure(0, weight=1)
-        body.grid_rowconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
 
-        info = ctk.CTkFrame(body, corner_radius=16)
-        info.grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        self.tabs = ctk.CTkTabview(body, corner_radius=18)
+        self.tabs.grid(row=0, column=0, sticky="nsew")
+
+        login_tab = self.tabs.add("Đăng nhập")
+        groups_tab = self.tabs.add("Tìm Group")
+
+        login_tab.grid_columnconfigure(0, weight=1)
+        login_tab.grid_rowconfigure(1, weight=1)
+        groups_tab.grid_columnconfigure(0, weight=1)
+        groups_tab.grid_rowconfigure(2, weight=1)
+
+        self._build_login_tab(login_tab)
+        self._build_groups_tab(groups_tab)
+
+    def _build_login_tab(self, parent):
+        info = ctk.CTkFrame(parent, corner_radius=16)
+        info.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 12))
         info.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -116,14 +136,14 @@ class FacebookCookieLoginApp(ctk.CTk):
 
         ctk.CTkLabel(
             info,
-            text="Định dạng hỗ trợ: c_user=...; xs=...; datr=...;  •  Không gửi cookie lên server.",
+            text="Định dạng: c_user=...; xs=...; datr=...;  •  Cookie không được lưu vào file.",
             anchor="w",
             text_color=("gray40", "gray70"),
             font=ctk.CTkFont(size=12),
         ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 14))
 
-        editor = ctk.CTkFrame(body, corner_radius=18)
-        editor.grid(row=1, column=0, sticky="nsew")
+        editor = ctk.CTkFrame(parent, corner_radius=18)
+        editor.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
         editor.grid_columnconfigure(0, weight=1)
         editor.grid_rowconfigure(1, weight=1)
 
@@ -139,17 +159,16 @@ class FacebookCookieLoginApp(ctk.CTk):
         )
         self.cookie_counter.grid(row=0, column=0, sticky="w")
 
-        paste_btn = ctk.CTkButton(
+        ctk.CTkButton(
             editor_top,
             text="Dán từ clipboard",
             width=138,
             height=34,
             corner_radius=10,
             command=self.paste_cookie,
-        )
-        paste_btn.grid(row=0, column=1, padx=(8, 8))
+        ).grid(row=0, column=1, padx=(8, 8))
 
-        clear_btn = ctk.CTkButton(
+        ctk.CTkButton(
             editor_top,
             text="Xóa",
             width=72,
@@ -158,8 +177,7 @@ class FacebookCookieLoginApp(ctk.CTk):
             fg_color=("gray75", "gray28"),
             hover_color=("gray68", "gray34"),
             command=self.clear_cookie,
-        )
-        clear_btn.grid(row=0, column=2)
+        ).grid(row=0, column=2)
 
         self.cookie_text = ctk.CTkTextbox(
             editor,
@@ -204,6 +222,105 @@ class FacebookCookieLoginApp(ctk.CTk):
         self.progress = ctk.CTkProgressBar(editor, mode="indeterminate")
         self.progress.grid(row=3, column=0, sticky="ew", padx=18, pady=(0, 18))
         self.progress.set(0)
+
+    def _build_groups_tab(self, parent):
+        search_card = ctk.CTkFrame(parent, corner_radius=16)
+        search_card.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 12))
+        search_card.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            search_card,
+            text="Group Finder",
+            anchor="w",
+            font=ctk.CTkFont(size=17, weight="bold"),
+        ).grid(row=0, column=0, columnspan=4, sticky="w", padx=20, pady=(16, 2))
+
+        ctk.CTkLabel(
+            search_card,
+            text=(
+                "Tìm group theo chủ đề và gom kết quả để bạn xem trước. "
+                "Tool không tự bấm Join và không né quy trình kiểm duyệt của group."
+            ),
+            anchor="w",
+            justify="left",
+            wraplength=820,
+            text_color=("gray40", "gray70"),
+            font=ctk.CTkFont(size=12),
+        ).grid(row=1, column=0, columnspan=4, sticky="ew", padx=20, pady=(0, 12))
+
+        self.group_keyword = ctk.CTkEntry(
+            search_card,
+            placeholder_text="Ví dụ: đồ công nghệ, du lịch, AI, ô tô...",
+            height=40,
+        )
+        self.group_keyword.grid(row=2, column=0, sticky="ew", padx=(20, 10), pady=(0, 16))
+
+        ctk.CTkLabel(
+            search_card,
+            text="Số lượng",
+            font=ctk.CTkFont(size=12),
+        ).grid(row=2, column=1, padx=(0, 6), pady=(0, 16))
+
+        self.group_limit = ctk.CTkEntry(search_card, width=70, height=40)
+        self.group_limit.insert(0, "20")
+        self.group_limit.grid(row=2, column=2, padx=(0, 10), pady=(0, 16))
+
+        self.group_scan_btn = ctk.CTkButton(
+            search_card,
+            text="Quét Group",
+            width=130,
+            height=40,
+            corner_radius=11,
+            command=self.start_group_scan,
+        )
+        self.group_scan_btn.grid(row=2, column=3, padx=(0, 20), pady=(0, 16))
+
+        action_bar = ctk.CTkFrame(parent, fg_color="transparent")
+        action_bar.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 10))
+        action_bar.grid_columnconfigure(1, weight=1)
+
+        self.group_count_label = ctk.CTkLabel(
+            action_bar,
+            text="Chưa có kết quả",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        self.group_count_label.grid(row=0, column=0, sticky="w")
+
+        self.group_status = ctk.CTkLabel(
+            action_bar,
+            text="Đăng nhập Facebook trước, sau đó nhập chủ đề để quét.",
+            anchor="e",
+            text_color=("gray40", "gray70"),
+            font=ctk.CTkFont(size=11),
+        )
+        self.group_status.grid(row=0, column=1, sticky="e", padx=(10, 10))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Mở tìm kiếm",
+            width=112,
+            height=32,
+            corner_radius=10,
+            fg_color=("gray75", "gray28"),
+            hover_color=("gray68", "gray34"),
+            command=self.open_group_search,
+        ).grid(row=0, column=2, sticky="e")
+
+        self.group_results_frame = ctk.CTkScrollableFrame(
+            parent,
+            corner_radius=16,
+            label_text="Kết quả tìm thấy",
+        )
+        self.group_results_frame.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=14,
+            pady=(0, 14),
+        )
+        self.group_results_frame.grid_columnconfigure(0, weight=1)
+
+        self._render_empty_group_state()
 
     def _build_footer(self):
         footer = ctk.CTkFrame(self, corner_radius=0, height=56)
@@ -408,6 +525,262 @@ class FacebookCookieLoginApp(ctk.CTk):
 
         finally:
             self.after(0, self.finish_login_ui)
+
+    def get_active_driver(self):
+        for driver in reversed(self.drivers):
+            try:
+                _ = driver.current_url
+                return driver
+            except Exception:
+                continue
+        return None
+
+    def _get_group_settings(self):
+        keyword = self.group_keyword.get().strip()
+        if not keyword:
+            raise ValueError("Hãy nhập chủ đề cần tìm.")
+
+        try:
+            limit = int(self.group_limit.get().strip())
+        except ValueError as exc:
+            raise ValueError("Số lượng phải là số nguyên.") from exc
+
+        if limit < 1 or limit > 100:
+            raise ValueError("Số lượng hỗ trợ từ 1 đến 100.")
+
+        return keyword, limit
+
+    def _group_search_url(self, keyword):
+        return f"https://www.facebook.com/search/groups/?q={quote_plus(keyword)}"
+
+    def open_group_search(self):
+        driver = self.get_active_driver()
+        if not driver:
+            messagebox.showinfo(
+                "Chưa có phiên Facebook",
+                "Hãy đăng nhập Facebook ở tab Đăng nhập trước.",
+            )
+            return
+
+        try:
+            keyword, _ = self._get_group_settings()
+        except ValueError as exc:
+            messagebox.showwarning("Thiếu thông tin", str(exc))
+            return
+
+        try:
+            driver.get(self._group_search_url(keyword))
+            self.group_status.configure(text="Đã mở trang tìm kiếm Facebook.")
+        except Exception as exc:
+            messagebox.showerror("Không mở được tìm kiếm", str(exc))
+
+    def start_group_scan(self):
+        driver = self.get_active_driver()
+        if not driver:
+            messagebox.showinfo(
+                "Chưa có phiên Facebook",
+                "Hãy đăng nhập Facebook ở tab Đăng nhập trước.",
+            )
+            return
+
+        try:
+            keyword, limit = self._get_group_settings()
+        except ValueError as exc:
+            messagebox.showwarning("Thiếu thông tin", str(exc))
+            return
+
+        self.group_scan_btn.configure(state="disabled", text="Đang quét...")
+        self.group_status.configure(text="Đang tải kết quả và gom các group hiển thị...")
+        self.group_count_label.configure(text="Đang quét...")
+
+        threading.Thread(
+            target=self.group_scan_worker,
+            args=(driver, keyword, limit),
+            daemon=True,
+        ).start()
+
+    def group_scan_worker(self, driver, keyword, limit):
+        try:
+            search_url = self._group_search_url(keyword)
+            if "/search/groups/" not in driver.current_url:
+                driver.get(search_url)
+                time.sleep(2.0)
+
+            groups = {}
+            stagnant_rounds = 0
+            last_count = 0
+            max_rounds = min(max(8, limit // 3 + 4), 35)
+
+            for _ in range(max_rounds):
+                anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/groups/']")
+
+                for anchor in anchors:
+                    try:
+                        href = anchor.get_attribute("href") or ""
+                        label = " ".join((anchor.text or "").split())
+
+                        match = re.search(
+                            r"^https://(?:www\.)?facebook\.com/groups/([^/?#]+)",
+                            href,
+                        )
+                        if not match:
+                            continue
+
+                        group_id = match.group(1)
+                        if group_id.lower() in {
+                            "feed",
+                            "discover",
+                            "create",
+                            "search",
+                            "groups",
+                        }:
+                            continue
+
+                        root_url = f"https://www.facebook.com/groups/{group_id}/"
+
+                        if root_url not in groups:
+                            groups[root_url] = label or f"Facebook Group {group_id}"
+                        elif label and len(label) > len(groups[root_url]):
+                            groups[root_url] = label
+
+                        if len(groups) >= limit:
+                            break
+                    except Exception:
+                        continue
+
+                if len(groups) >= limit:
+                    break
+
+                if len(groups) == last_count:
+                    stagnant_rounds += 1
+                else:
+                    stagnant_rounds = 0
+
+                if stagnant_rounds >= 3:
+                    break
+
+                last_count = len(groups)
+                driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight);"
+                )
+                time.sleep(1.25)
+
+            results = [
+                {"name": name, "url": url}
+                for url, name in list(groups.items())[:limit]
+            ]
+
+            self.after(0, lambda: self.render_group_results(results))
+            self.after(
+                0,
+                lambda: self.group_status.configure(
+                    text=(
+                        f"Đã gom {len(results)} group theo thứ tự Facebook hiển thị. "
+                        "Mở từng group để xem và tự quyết định tham gia."
+                    )
+                ),
+            )
+
+        except Exception as exc:
+            self.after(
+                0,
+                lambda: messagebox.showerror("Quét group thất bại", str(exc)),
+            )
+            self.after(
+                0,
+                lambda: self.group_status.configure(
+                    text="Không thể đọc kết quả tìm kiếm Facebook."
+                ),
+            )
+        finally:
+            self.after(
+                0,
+                lambda: self.group_scan_btn.configure(
+                    state="normal",
+                    text="Quét Group",
+                ),
+            )
+
+    def _render_empty_group_state(self):
+        for widget in self.group_results_frame.winfo_children():
+            widget.destroy()
+
+        ctk.CTkLabel(
+            self.group_results_frame,
+            text="Chưa có group nào được quét.",
+            text_color=("gray45", "gray60"),
+            font=ctk.CTkFont(size=13),
+        ).grid(row=0, column=0, pady=24)
+
+    def render_group_results(self, results):
+        self.group_results = results
+
+        for widget in self.group_results_frame.winfo_children():
+            widget.destroy()
+
+        if not results:
+            self.group_count_label.configure(text="0 group")
+            self._render_empty_group_state()
+            return
+
+        self.group_count_label.configure(text=f"{len(results)} group")
+
+        for index, group in enumerate(results, start=1):
+            row = ctk.CTkFrame(self.group_results_frame, corner_radius=12)
+            row.grid(row=index - 1, column=0, sticky="ew", padx=4, pady=5)
+            row.grid_columnconfigure(1, weight=1)
+
+            ctk.CTkLabel(
+                row,
+                text=str(index),
+                width=34,
+                height=34,
+                corner_radius=10,
+                fg_color=("gray82", "gray24"),
+                font=ctk.CTkFont(size=12, weight="bold"),
+            ).grid(row=0, column=0, rowspan=2, padx=(10, 10), pady=10)
+
+            ctk.CTkLabel(
+                row,
+                text=group["name"],
+                anchor="w",
+                justify="left",
+                font=ctk.CTkFont(size=13, weight="bold"),
+            ).grid(row=0, column=1, sticky="ew", pady=(10, 1))
+
+            ctk.CTkLabel(
+                row,
+                text=group["url"],
+                anchor="w",
+                text_color=("gray45", "gray62"),
+                font=ctk.CTkFont(size=10),
+            ).grid(row=1, column=1, sticky="ew", pady=(0, 10))
+
+            ctk.CTkButton(
+                row,
+                text="Mở",
+                width=72,
+                height=34,
+                corner_radius=10,
+                command=lambda url=group["url"]: self.open_group(url),
+            ).grid(row=0, column=2, rowspan=2, padx=12, pady=10)
+
+    def open_group(self, url):
+        driver = self.get_active_driver()
+        if not driver:
+            messagebox.showinfo(
+                "Chưa có phiên Facebook",
+                "Phiên Chrome đã đóng. Hãy đăng nhập lại.",
+            )
+            return
+
+        try:
+            driver.execute_script("window.open(arguments[0], '_blank');", url)
+            self.group_status.configure(
+                text="Đã mở group trong tab mới. Bạn có thể kiểm tra rồi bấm Join thủ công."
+            )
+        except Exception as exc:
+            messagebox.showerror("Không mở được group", str(exc))
 
     def on_close(self):
         for driver in list(self.drivers):
