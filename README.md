@@ -78,3 +78,17 @@ Artifact chứa `FacebookCookieLogin.exe`.
 7. Nhấn **Mở** để kiểm tra từng group và tự quyết định có tham gia hay không.
 
 Group Finder không tự gửi yêu cầu Join hàng loạt và không có chức năng né kiểm duyệt/luật đăng bài của group.
+
+
+## Chọn nhiều group để duyệt
+
+Sau khi quét group:
+
+1. Tick những group bạn quan tâm hoặc dùng **Chọn tất cả**.
+2. Nhấn **Duyệt đã chọn**.
+3. Tool mở group đầu tiên trong Chrome.
+4. Bạn kiểm tra nội dung/quy định và bấm **Join** thủ công nếu muốn.
+5. Quay lại tool và nhấn **Nhóm tiếp theo**.
+6. Lặp lại cho đến hết danh sách đã chọn.
+
+Tool không tự gửi yêu cầu tham gia hàng loạt; mỗi lần tham gia vẫn do bạn xác nhận trực tiếp trên Facebook.
