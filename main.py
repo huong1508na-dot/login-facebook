@@ -848,7 +848,7 @@ class FacebookCookieLoginApp(ctk.CTk):
         for index, group in enumerate(results, start=1):
             row = ctk.CTkFrame(self.group_results_frame, corner_radius=12)
             row.grid(row=index - 1, column=0, sticky="ew", padx=4, pady=5)
-            row.grid_columnconfigure(1, weight=1)
+            row.grid_columnconfigure(2, weight=1)
 
             selected_var = tk.BooleanVar(value=False)
             self.group_select_vars[group["url"]] = selected_var
