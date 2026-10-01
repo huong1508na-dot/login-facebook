@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.3"
+APP_VERSION = "2.4"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -737,6 +737,34 @@ class FacebookCookieLoginApp(ctk.CTk):
             daemon=True,
         ).start()
 
+    def _group_relevance_score(self, name, context, keyword):
+        terms = [
+            term.casefold()
+            for term in re.findall(r"\w+", keyword, flags=re.UNICODE)
+            if len(term) >= 2
+        ]
+        name_cf = (name or "").casefold()
+        context_cf = (context or "").casefold()
+
+        score = 0
+        for term in terms:
+            if term in name_cf:
+                score += 4
+            elif term in context_cf:
+                score += 1
+        return score
+
+    def _group_visibility_from_context(self, context):
+        text = (context or "").casefold()
+        public_markers = ("công khai", "public group", "public")
+        private_markers = ("riêng tư", "private group", "private")
+
+        if any(marker in text for marker in public_markers):
+            return "Công khai"
+        if any(marker in text for marker in private_markers):
+            return "Riêng tư"
+        return "Không rõ"
+
     def group_scan_worker(self, driver, keyword, limit):
         try:
             search_url = self._group_search_url(keyword)
@@ -746,7 +774,8 @@ class FacebookCookieLoginApp(ctk.CTk):
             groups = {}
             stagnant_rounds = 0
             last_count = 0
-            max_rounds = min(max(8, limit // 3 + 4), 35)
+            candidate_target = min(max(limit * 2, limit), 100)
+            max_rounds = min(max(10, candidate_target // 3 + 4), 40)
 
             for _ in range(max_rounds):
                 anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/groups/']")
@@ -755,6 +784,22 @@ class FacebookCookieLoginApp(ctk.CTk):
                     try:
                         href = anchor.get_attribute("href") or ""
                         label = " ".join((anchor.text or "").split())
+
+                        context = ""
+                        try:
+                            context = driver.execute_script(
+                                """
+                                let e = arguments[0];
+                                let parts = [];
+                                for (let i = 0; i < 4 && e; i++, e = e.parentElement) {
+                                    if (e.innerText) parts.push(e.innerText);
+                                }
+                                return parts.join(" | ");
+                                """,
+                                anchor,
+                            ) or ""
+                        except Exception:
+                            context = ""
 
                         match = re.search(
                             r"^https://(?:www\.)?facebook\.com/groups/([^/?#]+)",
@@ -776,16 +821,23 @@ class FacebookCookieLoginApp(ctk.CTk):
                         root_url = f"https://www.facebook.com/groups/{group_id}/"
 
                         if root_url not in groups:
-                            groups[root_url] = label or f"Facebook Group {group_id}"
-                        elif label and len(label) > len(groups[root_url]):
-                            groups[root_url] = label
+                            name = label or f"Facebook Group {group_id}"
+                            groups[root_url] = {
+                                "name": name,
+                                "context": context,
+                                "order": len(groups),
+                            }
+                        elif label and len(label) > len(groups[root_url]["name"]):
+                            groups[root_url]["name"] = label
+                            if context:
+                                groups[root_url]["context"] = context
 
-                        if len(groups) >= limit:
+                        if len(groups) >= candidate_target:
                             break
                     except Exception:
                         continue
 
-                if len(groups) >= limit:
+                if len(groups) >= candidate_target:
                     break
 
                 if len(groups) == last_count:
@@ -802,18 +854,48 @@ class FacebookCookieLoginApp(ctk.CTk):
                 )
                 time.sleep(1.25)
 
-            results = [
-                {"name": name, "url": url}
-                for url, name in list(groups.items())[:limit]
-            ]
+            ranked = []
+            for url, meta in groups.items():
+                visibility = self._group_visibility_from_context(meta["context"])
+                relevance = self._group_relevance_score(
+                    meta["name"],
+                    meta["context"],
+                    keyword,
+                )
+                visibility_rank = {
+                    "Công khai": 0,
+                    "Không rõ": 1,
+                    "Riêng tư": 2,
+                }.get(visibility, 1)
+
+                ranked.append(
+                    {
+                        "name": meta["name"],
+                        "url": url,
+                        "visibility": visibility,
+                        "relevance": relevance,
+                        "order": meta["order"],
+                        "_sort": (
+                            visibility_rank,
+                            -relevance,
+                            meta["order"],
+                        ),
+                    }
+                )
+
+            ranked.sort(key=lambda item: item["_sort"])
+            results = ranked[:limit]
+
+            for item in results:
+                item.pop("_sort", None)
 
             self.after(0, lambda: self.render_group_results(results))
             self.after(
                 0,
                 lambda: self.group_status.configure(
                     text=(
-                        f"Đã gom {len(results)} group theo thứ tự Facebook hiển thị. "
-                        "Mở từng group để xem và tự quyết định tham gia."
+                        f"Đã xếp {len(results)} group: ưu tiên Công khai khi Facebook "
+                        "hiển thị rõ, sau đó theo độ khớp chủ đề và thứ tự Facebook."
                     )
                 ),
             )
@@ -905,9 +987,14 @@ class FacebookCookieLoginApp(ctk.CTk):
                 font=ctk.CTkFont(size=13, weight="bold"),
             ).grid(row=0, column=2, sticky="ew", pady=(10, 1))
 
+            detail_text = group["url"]
+            visibility = group.get("visibility")
+            if visibility:
+                detail_text = f"{visibility}  •  {detail_text}"
+
             ctk.CTkLabel(
                 row,
-                text=group["url"],
+                text=detail_text,
                 anchor="w",
                 text_color=("gray45", "gray62"),
                 font=ctk.CTkFont(size=10),
