@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.2"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -56,6 +56,9 @@ class FacebookCookieLoginApp(ctk.CTk):
 
         self.drivers = []
         self.group_results = []
+        self.group_select_vars = {}
+        self.review_queue = []
+        self.review_index = -1
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.grid_columnconfigure(0, weight=1)
@@ -306,13 +309,56 @@ class FacebookCookieLoginApp(ctk.CTk):
         ctk.CTkButton(
             action_bar,
             text="Mở tìm kiếm",
-            width=112,
+            width=104,
             height=32,
             corner_radius=10,
             fg_color=("gray75", "gray28"),
             hover_color=("gray68", "gray34"),
             command=self.open_group_search,
-        ).grid(row=0, column=2, sticky="e")
+        ).grid(row=0, column=2, sticky="e", padx=(4, 4))
+
+        ctk.CTkButton(
+            action_bar,
+            text="Chọn tất cả",
+            width=96,
+            height=32,
+            corner_radius=10,
+            fg_color=("gray75", "gray28"),
+            hover_color=("gray68", "gray34"),
+            command=self.select_all_groups,
+        ).grid(row=0, column=3, sticky="e", padx=4)
+
+        ctk.CTkButton(
+            action_bar,
+            text="Bỏ chọn",
+            width=82,
+            height=32,
+            corner_radius=10,
+            fg_color=("gray75", "gray28"),
+            hover_color=("gray68", "gray34"),
+            command=self.clear_group_selection,
+        ).grid(row=0, column=4, sticky="e", padx=4)
+
+        self.review_start_btn = ctk.CTkButton(
+            action_bar,
+            text="Duyệt đã chọn",
+            width=112,
+            height=32,
+            corner_radius=10,
+            command=self.start_selected_review,
+        )
+        self.review_start_btn.grid(row=0, column=5, sticky="e", padx=4)
+
+        self.review_next_btn = ctk.CTkButton(
+            action_bar,
+            text="Nhóm tiếp theo",
+            width=118,
+            height=32,
+            corner_radius=10,
+            state="disabled",
+            command=self.open_next_review_group,
+        )
+        self.review_next_btn.grid(row=0, column=6, sticky="e", padx=(4, 0))
 
         self.group_results_frame = ctk.CTkScrollableFrame(
             parent,
@@ -784,6 +830,10 @@ class FacebookCookieLoginApp(ctk.CTk):
 
     def render_group_results(self, results):
         self.group_results = results
+        self.group_select_vars = {}
+        self.review_queue = []
+        self.review_index = -1
+        self.review_next_btn.configure(state="disabled")
 
         for widget in self.group_results_frame.winfo_children():
             widget.destroy()
@@ -800,6 +850,17 @@ class FacebookCookieLoginApp(ctk.CTk):
             row.grid(row=index - 1, column=0, sticky="ew", padx=4, pady=5)
             row.grid_columnconfigure(1, weight=1)
 
+            selected_var = tk.BooleanVar(value=False)
+            self.group_select_vars[group["url"]] = selected_var
+
+            ctk.CTkCheckBox(
+                row,
+                text="",
+                width=24,
+                variable=selected_var,
+                command=self.update_selected_group_status,
+            ).grid(row=0, column=0, rowspan=2, padx=(10, 4), pady=10)
+
             ctk.CTkLabel(
                 row,
                 text=str(index),
@@ -808,7 +869,7 @@ class FacebookCookieLoginApp(ctk.CTk):
                 corner_radius=10,
                 fg_color=("gray82", "gray24"),
                 font=ctk.CTkFont(size=12, weight="bold"),
-            ).grid(row=0, column=0, rowspan=2, padx=(10, 10), pady=10)
+            ).grid(row=0, column=1, rowspan=2, padx=(4, 10), pady=10)
 
             ctk.CTkLabel(
                 row,
@@ -816,7 +877,7 @@ class FacebookCookieLoginApp(ctk.CTk):
                 anchor="w",
                 justify="left",
                 font=ctk.CTkFont(size=13, weight="bold"),
-            ).grid(row=0, column=1, sticky="ew", pady=(10, 1))
+            ).grid(row=0, column=2, sticky="ew", pady=(10, 1))
 
             ctk.CTkLabel(
                 row,
@@ -824,7 +885,7 @@ class FacebookCookieLoginApp(ctk.CTk):
                 anchor="w",
                 text_color=("gray45", "gray62"),
                 font=ctk.CTkFont(size=10),
-            ).grid(row=1, column=1, sticky="ew", pady=(0, 10))
+            ).grid(row=1, column=2, sticky="ew", pady=(0, 10))
 
             ctk.CTkButton(
                 row,
@@ -833,7 +894,87 @@ class FacebookCookieLoginApp(ctk.CTk):
                 height=34,
                 corner_radius=10,
                 command=lambda url=group["url"]: self.open_group(url),
-            ).grid(row=0, column=2, rowspan=2, padx=12, pady=10)
+            ).grid(row=0, column=3, rowspan=2, padx=12, pady=10)
+
+    def update_selected_group_status(self):
+        selected = sum(
+            1 for var in self.group_select_vars.values() if var.get()
+        )
+        total = len(self.group_results)
+        self.group_count_label.configure(
+            text=f"{total} group • đã chọn {selected}"
+        )
+
+    def select_all_groups(self):
+        for var in self.group_select_vars.values():
+            var.set(True)
+        self.update_selected_group_status()
+
+    def clear_group_selection(self):
+        for var in self.group_select_vars.values():
+            var.set(False)
+        self.review_queue = []
+        self.review_index = -1
+        self.review_next_btn.configure(state="disabled")
+        self.update_selected_group_status()
+
+    def start_selected_review(self):
+        selected_urls = {
+            url for url, var in self.group_select_vars.items() if var.get()
+        }
+        self.review_queue = [
+            group for group in self.group_results if group["url"] in selected_urls
+        ]
+        self.review_index = -1
+
+        if not self.review_queue:
+            messagebox.showinfo(
+                "Chưa chọn group",
+                "Hãy tick các group muốn duyệt trước.",
+            )
+            return
+
+        self.review_next_btn.configure(state="normal")
+        self.open_next_review_group()
+
+    def open_next_review_group(self):
+        if not self.review_queue:
+            self.review_next_btn.configure(state="disabled")
+            return
+
+        self.review_index += 1
+        if self.review_index >= len(self.review_queue):
+            self.review_next_btn.configure(state="disabled")
+            self.group_status.configure(
+                text="Đã duyệt hết các group đã chọn."
+            )
+            messagebox.showinfo(
+                "Hoàn tất",
+                "Bạn đã duyệt hết danh sách group đã chọn.",
+            )
+            return
+
+        group = self.review_queue[self.review_index]
+        driver = self.get_active_driver()
+        if not driver:
+            messagebox.showinfo(
+                "Chưa có phiên Facebook",
+                "Phiên Chrome đã đóng. Hãy đăng nhập lại.",
+            )
+            self.review_next_btn.configure(state="disabled")
+            return
+
+        try:
+            driver.get(group["url"])
+            self.group_status.configure(
+                text=(
+                    f"Đang duyệt {self.review_index + 1}/{len(self.review_queue)}: "
+                    f"{group['name']}. Kiểm tra group, bấm Join thủ công nếu muốn, "
+                    "sau đó chọn Nhóm tiếp theo."
+                )
+            )
+        except Exception as exc:
+            messagebox.showerror("Không mở được group", str(exc))
 
     def open_group(self, url):
         driver = self.get_active_driver()
