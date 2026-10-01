@@ -30,6 +30,7 @@ python -m PyInstaller ^
   --noconsole ^
   --name FacebookCookieLogin ^
   --collect-all customtkinter ^
+  --collect-submodules selenium.webdriver ^
   main.py
 
 if errorlevel 1 goto :error
