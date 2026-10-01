@@ -1,4 +1,4 @@
-# Facebook Cookie Login v2
+# Facebook Session Toolkit v2.1
 
 Ứng dụng Windows có giao diện hiện đại để nạp **cookie của chính tài khoản Facebook bạn** vào Google Chrome và mở phiên đăng nhập cục bộ.
 
@@ -11,7 +11,7 @@
 - Tùy chọn mở Chrome ẩn danh.
 - Tự đóng các phiên Chrome do ứng dụng mở khi thoát app.
 - Không lưu cookie ra file.
-- Có script và GitHub Actions để build Windows EXE.
+- Có script và GitHub Actions để build Windows EXE.\n- Có tab **Tìm Group**: nhập chủ đề, chọn 1–100 kết quả, quét group đang hiển thị và mở từng group để duyệt thủ công.
 
 ## Cách dùng bản Python
 
@@ -65,3 +65,16 @@ Artifact chứa `FacebookCookieLogin.exe`.
 - Google Chrome
 - Internet
 - Với bản EXE đã build: không cần cài Python để chạy ứng dụng.
+
+
+## Group Finder
+
+1. Đăng nhập Facebook ở tab **Đăng nhập**.
+2. Chuyển sang tab **Tìm Group**.
+3. Nhập chủ đề cần tìm.
+4. Chọn số lượng từ 1 đến 100.
+5. Nhấn **Quét Group**.
+6. Tool sẽ cuộn trang tìm kiếm, gom các group Facebook đang hiển thị và đưa vào danh sách.
+7. Nhấn **Mở** để kiểm tra từng group và tự quyết định có tham gia hay không.
+
+Group Finder không tự gửi yêu cầu Join hàng loạt và không có chức năng né kiểm duyệt/luật đăng bài của group.
