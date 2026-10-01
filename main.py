@@ -1002,8 +1002,8 @@ class FacebookCookieLoginApp(ctk.CTk):
             self.group_status.configure(
                 text=(
                     f"Đang duyệt {self.review_index + 1}/{len(self.review_queue)}: "
-                    f"{group['name']}. Kiểm tra group, bấm Join thủ công nếu muốn, "
-                    "sau đó chọn Nhóm tiếp theo."
+                    f"{group['name']}. Nhấn F8 hoặc nút lớn để tham gia; "
+                    "sau đó nhấn F9 hoặc Nhóm tiếp theo."
                 )
             )
         except Exception as exc:
@@ -1046,6 +1046,14 @@ class FacebookCookieLoginApp(ctk.CTk):
             messagebox.showinfo(
                 "Chưa có phiên Facebook",
                 "Phiên Chrome đã đóng. Hãy đăng nhập lại.",
+            )
+            return
+
+        current_url = (driver.current_url or "").lower()
+        if "facebook.com/groups/" not in current_url:
+            messagebox.showwarning(
+                "Không ở trang group",
+                "Chrome hiện không ở trang Facebook Group. Hãy mở group đang duyệt trước.",
             )
             return
 
