@@ -46,7 +46,7 @@ jobs:
       - name: Build EXE
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --noconsole --name FacebookCookieLogin --collect-all customtkinter main.py
+          python -m PyInstaller --noconfirm --clean --onefile --noconsole --name FacebookCookieLogin --collect-all customtkinter --collect-submodules selenium.webdriver main.py
 
       - name: Packaged EXE self-test
         shell: pwsh
