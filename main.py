@@ -602,9 +602,8 @@ class FacebookCookieLoginApp(ctk.CTk):
     def group_scan_worker(self, driver, keyword, limit):
         try:
             search_url = self._group_search_url(keyword)
-            if "/search/groups/" not in driver.current_url:
-                driver.get(search_url)
-                time.sleep(2.0)
+            driver.get(search_url)
+            time.sleep(2.0)
 
             groups = {}
             stagnant_rounds = 0
