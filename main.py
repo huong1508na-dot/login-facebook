@@ -19,7 +19,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
-from uid_checker import UidCheckerTab
+from uid_checker import UidCheckerTab, parse_uids
 
 
 APP_NAME = "Facebook Cookie Login"
@@ -1296,7 +1296,10 @@ def run_self_test():
     sample = "c_user=12345; xs=abc%3Axyz; datr=test;"
     parsed = parse_cookie_header(sample)
     names = {item["name"] for item in parsed}
-    return 0 if {"c_user", "xs", "datr"}.issubset(names) else 1
+    uids, invalid = parse_uids("uid,cookie\n100000000000001|c_user=fake;xs=fake\n100000000000002,abc\n100000000000001|duplicate")
+    cookies_ok = {"c_user", "xs", "datr"}.issubset(names)
+    uid_ok = uids == ["100000000000001", "100000000000002"] and invalid == 1
+    return 0 if cookies_ok and uid_ok else 1
 
 
 def run_chrome_self_test():
