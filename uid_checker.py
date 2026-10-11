@@ -258,9 +258,10 @@ class UidCheckerTab:
                     "max_checks_per_minute", "rate_limit_per_minute"
                 }
             )
-            batch_size = min([50] + batch_caps)
             per_minute = min(per_minute_caps) if per_minute_caps else None
-            outstanding = [uid for uid in self.uids if self.results[uid] == "CHƯA KIỂM TRA"]
+            batch_size = min([50] + batch_caps + ([per_minute] if per_minute else []))
+            outstanding = [uid for uid in self.uids
+                           if self.results[uid] != "LIVE"]
             for pos in range(0, len(outstanding), batch_size):
                 if self.cancel.is_set():
                     break
@@ -277,8 +278,14 @@ class UidCheckerTab:
                         payload={"platform": "facebook", "identifiers": chunk},
                         idempotency_key=idem
                     )
-                    if data.get("check_id") and not data.get("results"):
-                        data = api_json("/checker/checks/" + str(data["check_id"]), key)
+                    # API may create an asynchronous check before results arrive.
+                    check_id = data.get("check_id")
+                    for _ in range(8):
+                        if not check_id or data.get("results") or self.cancel.is_set():
+                            break
+                        if self.cancel.wait(2):
+                            break
+                        data = api_json("/checker/checks/" + str(check_id), key)
                     for row in data.get("results", []):
                         uid = str(row.get("identifier", ""))
                         state = str(row.get("status", "")).lower()
@@ -296,17 +303,18 @@ class UidCheckerTab:
                             seconds = min(120, max(1, int(pause)))
                         except (TypeError, ValueError):
                             seconds = 30
-                        time.sleep(seconds)
+                        self.cancel.wait(seconds)
                 except (URLError, ValueError, OSError, TimeoutError, TypeError, KeyError):
                     outcome = {uid: "API_ERROR" for uid in chunk}
                 self.results.update(outcome)
                 self._schedule(lambda x=outcome.copy(): self._update_result(x))
                 if per_minute and not self.cancel.is_set():
-                    delay = min(120, 60.0 * len(chunk) / per_minute)
-                    time.sleep(delay)
+                    delay = 60.0 * len(chunk) / per_minute
+                    self.cancel.wait(delay)
             self._schedule(self._finished)
         except Exception as exc:
-            self._schedule(lambda: self._finished(error=str(type(exc).__name__)))
+            error_name = type(exc).__name__
+            self._schedule(lambda err=error_name: self._finished(error=err))
 
     def _update_result(self, outcome):
         for uid, status in outcome.items():
