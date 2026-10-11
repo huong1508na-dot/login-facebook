@@ -103,3 +103,25 @@ Khi đang duyệt danh sách group đã chọn:
 - **F9** hoặc **Nhóm tiếp theo**: chuyển sang group kế tiếp.
 
 Chế độ này giảm thao tác chuột xuống mức tối thiểu nhưng vẫn cần một xác nhận của bạn cho từng group.
+
+
+## Check LIVE Facebook (nhánh feature/uid-live-checker, v2.5)
+
+- Tab mới **Check LIVE** bên cạnh **Đăng nhập** và **Tìm Group**. Luồng Chrome/Selenium cũ vẫn giữ nguyên.
+- Nhập TXT hoặc CSV, mỗi dòng có thể là `UID`, `UID|Cookie`, `UID,Cookie`. Chỉ lấy UID dạng số; dữ liệu Cookie bị loại bỏ ngay khi nhập, không được gửi tới API hoặc xuất ra CSV.
+- Danh sách giới hạn 10.000 UID duy nhất. Có thể gán nhãn nguồn `NoVerify` hoặc `Verify` bằng menu (đây là nhãn người dùng chọn, tool **không tự xác thực** tình trạng verify).
+- Điền API Key có quyền `checker:read` và `checker:write` vào giao diện, sau đó nhấn **Bắt đầu check UID**. Key chỉ nằm trong bộ nhớ ứng dụng, không ghi vào repo hay file xuất.
+- Đọc `GET /checker/capabilities` để điều chỉnh số UID mỗi đợt (tối đa mặc định 50); `POST /checker/checks` có Idempotency-Key mới; `GET /checker/checks/{check_id}` cho kết quả bất đồng bộ. Có tiến độ, tạm dừng, dừng và chạy lại các kết quả UNKNOWN/API_ERROR.
+- Kết quả phân loại `LIVE`, `UNKNOWN`, `API_ERROR`, `CHƯA KIỂM TRA`. API hiện **không chứng minh được DIE**, không thể kết luận cookie còn đăng nhập được hay tài khoản đã vượt checkpoint.
+- Xuất CSV gồm UID, nhãn nhóm, trạng thái UID và thời gian; không có Cookie.
+
+Tham khảo tài liệu API từ nhà cung cấp: https://accinsfb.com/client/api-docs.
+API bên thứ ba chưa được kiểm nghiệm độc lập; cần tự đăng ký quyền và API Key, thử với bộ UID có sự đồng ý trước khi sử dụng rộng rãi. Không nhập Cookie vào bất kỳ dịch vụ trực tuyến nào.
+
+### Test nhanh
+
+```bash
+python main.py --self-test
+```
+
+Kiểm tra này chỉ xác nhận parsing UID và Cookie mẫu giả; **chưa kiểm thử API với Key thật, UI Windows hoặc bản build EXE**. Không merge vào main cho đến khi kiểm thử các phần trên.
