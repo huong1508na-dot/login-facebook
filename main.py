@@ -19,9 +19,11 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
+from uid_checker import UidCheckerTab
+
 
 APP_NAME = "Facebook Cookie Login"
-APP_VERSION = "2.4"
+APP_VERSION = "2.5"
 FACEBOOK_URL = "https://www.facebook.com/"
 
 ctk.set_appearance_mode("dark")
@@ -126,6 +128,7 @@ class FacebookCookieLoginApp(ctk.CTk):
 
         login_tab = self.tabs.add("Đăng nhập")
         groups_tab = self.tabs.add("Tìm Group")
+        checker_tab = self.tabs.add("Check LIVE")
 
         login_tab.grid_columnconfigure(0, weight=1)
         login_tab.grid_rowconfigure(1, weight=1)
@@ -134,6 +137,7 @@ class FacebookCookieLoginApp(ctk.CTk):
 
         self._build_login_tab(login_tab)
         self._build_groups_tab(groups_tab)
+        self.uid_checker = UidCheckerTab(checker_tab)
 
     def _build_login_tab(self, parent):
         info = ctk.CTkFrame(parent, corner_radius=16)
